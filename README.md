@@ -14,7 +14,10 @@
     - cargo watch -x 'run'
 
 5. Since we are starting program on localhost, we can access it in browser at this url:
-    - `http://127.0.0.1:4000/`
+    - Get all json data: `http://127.0.0.1:4000/`
+    - Get pollutant_avg: `http://127.0.0.1:4000/average`
+    - Get pollutant_max: `http://127.0.0.1:4000/maximum`
+    - Get pollutant_min: `http://127.0.0.1:4000/minimum`
 
 6. Sample Output of program in browser looks as follows:
 ```json
