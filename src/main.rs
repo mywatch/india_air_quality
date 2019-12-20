@@ -7,7 +7,6 @@ use futures::prelude::*;
 use reqwest::r#async::Client;
 use serde::{Deserialize, Serialize};
 
-
 #[derive(Debug, Serialize, Deserialize)]
 pub struct JsonTargetBucket {
     pub index: String,
@@ -65,10 +64,23 @@ pub struct Response {
     pub records: Vec<JsonRecord>,
 }
 
+#[derive(Debug, Serialize, Deserialize)]
+pub struct ResponseAvg {
+    pub avg: u32,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct ResponseMax {
+    pub max: u32,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct ResponseMin {
+    pub min: u32,
+}
 
 #[get("/")]
 fn index() -> Box<dyn Future<Item = Json<Response>, Error = ()>> {
-
     let cli = Client::builder().build().unwrap();
     Box::new(
         cli.get("https://api.data.gov.in/resource/3b01bcb8-0b14-4abf-b6f2-c1bfd384ba69?api-key=579b464db66ec23bdd000001cdd3946e44ce4aad7209ff7b23ac571b&format=json&offset=5&limit=10")
@@ -82,10 +94,84 @@ fn index() -> Box<dyn Future<Item = Json<Response>, Error = ()>> {
     )
 }
 
+#[get("/average")]
+fn index_avg() -> Box<dyn Future<Item = Json<ResponseAvg>, Error = ()>> {
+    let cli = Client::builder().build().unwrap();
+    Box::new(
+        cli.get("https://api.data.gov.in/resource/3b01bcb8-0b14-4abf-b6f2-c1bfd384ba69?api-key=579b464db66ec23bdd000001cdd3946e44ce4aad7209ff7b23ac571b&format=json&offset=5&limit=10")
+            .send()
+            .map_err(|e| println!("Request error: {}", e))
+            .and_then(|mut res| {
+                res.json::<Response>()
+                    .map(|r| {
+                        let mut sum = 0;
+                        for item in r.records.iter(){
+                            sum += item.pollutant_avg.parse::<u32>().unwrap();
+                        }
+                        let avg = ResponseAvg{avg: sum/(r.records.len() as u32),};
+                        Json(avg)
+                    })
+                    .map_err(|e| println!("unpack error: {}", e))
+            }),
+    )
+}
+
+#[get("/maximum")]
+fn index_max() -> Box<dyn Future<Item = Json<ResponseMax>, Error = ()>> {
+    let cli = Client::builder().build().unwrap();
+    Box::new(
+        cli.get("https://api.data.gov.in/resource/3b01bcb8-0b14-4abf-b6f2-c1bfd384ba69?api-key=579b464db66ec23bdd000001cdd3946e44ce4aad7209ff7b23ac571b&format=json&offset=5&limit=10")
+            .send()
+            .map_err(|e| println!("Request error: {}", e))
+            .and_then(|mut res| {
+                res.json::<Response>()
+                    .map(|r| {
+                        let mut max = Vec::<u32>::new();
+                        for item in r.records.iter(){
+                            max.push(item.pollutant_max.parse::<u32>().unwrap());
+                        }
+                        let max_value = *max.iter().max_by(|x, y| x.cmp(y)).unwrap();
+                        let max = ResponseMax{max: max_value,};
+                        Json(max)
+                    })
+                    .map_err(|e| println!("unpack error: {}", e))
+            }),
+    )
+}
+
+#[get("/minimum")]
+fn index_min() -> Box<dyn Future<Item = Json<ResponseMin>, Error = ()>> {
+    let cli = Client::builder().build().unwrap();
+    Box::new(
+        cli.get("https://api.data.gov.in/resource/3b01bcb8-0b14-4abf-b6f2-c1bfd384ba69?api-key=579b464db66ec23bdd000001cdd3946e44ce4aad7209ff7b23ac571b&format=json&offset=5&limit=10")
+            .send()
+            .map_err(|e| println!("Request error: {}", e))
+            .and_then(|mut res| {
+                res.json::<Response>()
+                    .map(|r| {
+                        let mut min = Vec::<u32>::new();
+                        for item in r.records.iter(){
+                            min.push(item.pollutant_avg.parse::<u32>().unwrap());
+                        }
+                        let min_value = *min.iter().min_by(|x, y| x.cmp(y)).unwrap();
+                        let min = ResponseMin{min: min_value,};
+                        Json(min)
+                    })
+                    .map_err(|e| println!("unpack error: {}", e))
+            }),
+    )
+}
+
 fn main() -> Result<(), ()> {
-    HttpServer::new(|| App::new().service(index))
-        .bind("127.0.0.1:4000")
-        .unwrap()
-        .run()
-        .map_err(|e| println!("Error: {}", e))
+    HttpServer::new(|| {
+        App::new()
+            .service(index)
+            .service(index_avg)
+            .service(index_max)
+            .service(index_min)
+    })
+    .bind("127.0.0.1:4000")
+    .unwrap()
+    .run()
+    .map_err(|e| println!("Error: {}", e))
 }
