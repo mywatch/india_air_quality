@@ -1,11 +1,13 @@
 #[macro_use]
 extern crate actix_web;
+extern crate config;
 
 use actix_web::web::Json;
-use actix_web::{App, HttpServer};
+use actix_web::{web, App, HttpServer};
 use futures::prelude::*;
 use reqwest::r#async::Client;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct JsonTargetBucket {
@@ -80,10 +82,12 @@ pub struct ResponseMin {
 }
 
 #[get("/")]
-fn index() -> Box<dyn Future<Item = Json<Response>, Error = ()>> {
+fn index(
+    data: web::Data<HashMap<String, String>>,
+) -> Box<dyn Future<Item = Json<Response>, Error = ()>> {
     let cli = Client::builder().build().unwrap();
     Box::new(
-        cli.get("https://api.data.gov.in/resource/3b01bcb8-0b14-4abf-b6f2-c1bfd384ba69?api-key=579b464db66ec23bdd000001cdd3946e44ce4aad7209ff7b23ac571b&format=json&offset=5&limit=10")
+        cli.get(data.get("api_url").unwrap())
             .send()
             .map_err(|e| println!("Request error: {}", e))
             .and_then(|mut res| {
@@ -95,20 +99,24 @@ fn index() -> Box<dyn Future<Item = Json<Response>, Error = ()>> {
 }
 
 #[get("/average")]
-fn index_avg() -> Box<dyn Future<Item = Json<ResponseAvg>, Error = ()>> {
+fn index_avg(
+    data: web::Data<HashMap<String, String>>,
+) -> Box<dyn Future<Item = Json<ResponseAvg>, Error = ()>> {
     let cli = Client::builder().build().unwrap();
     Box::new(
-        cli.get("https://api.data.gov.in/resource/3b01bcb8-0b14-4abf-b6f2-c1bfd384ba69?api-key=579b464db66ec23bdd000001cdd3946e44ce4aad7209ff7b23ac571b&format=json&offset=5&limit=10")
+        cli.get(data.get("api_url").unwrap())
             .send()
             .map_err(|e| println!("Request error: {}", e))
             .and_then(|mut res| {
                 res.json::<Response>()
                     .map(|r| {
                         let mut sum = 0;
-                        for item in r.records.iter(){
+                        for item in r.records.iter() {
                             sum += item.pollutant_avg.parse::<u32>().unwrap();
                         }
-                        let avg = ResponseAvg{avg: sum/(r.records.len() as u32),};
+                        let avg = ResponseAvg {
+                            avg: sum / (r.records.len() as u32),
+                        };
                         Json(avg)
                     })
                     .map_err(|e| println!("unpack error: {}", e))
@@ -117,21 +125,23 @@ fn index_avg() -> Box<dyn Future<Item = Json<ResponseAvg>, Error = ()>> {
 }
 
 #[get("/maximum")]
-fn index_max() -> Box<dyn Future<Item = Json<ResponseMax>, Error = ()>> {
+fn index_max(
+    data: web::Data<HashMap<String, String>>,
+) -> Box<dyn Future<Item = Json<ResponseMax>, Error = ()>> {
     let cli = Client::builder().build().unwrap();
     Box::new(
-        cli.get("https://api.data.gov.in/resource/3b01bcb8-0b14-4abf-b6f2-c1bfd384ba69?api-key=579b464db66ec23bdd000001cdd3946e44ce4aad7209ff7b23ac571b&format=json&offset=5&limit=10")
+        cli.get(data.get("api_url").unwrap())
             .send()
             .map_err(|e| println!("Request error: {}", e))
             .and_then(|mut res| {
                 res.json::<Response>()
                     .map(|r| {
                         let mut max = Vec::<u32>::new();
-                        for item in r.records.iter(){
+                        for item in r.records.iter() {
                             max.push(item.pollutant_max.parse::<u32>().unwrap());
                         }
                         let max_value = *max.iter().max_by(|x, y| x.cmp(y)).unwrap();
-                        let max = ResponseMax{max: max_value,};
+                        let max = ResponseMax { max: max_value };
                         Json(max)
                     })
                     .map_err(|e| println!("unpack error: {}", e))
@@ -140,21 +150,23 @@ fn index_max() -> Box<dyn Future<Item = Json<ResponseMax>, Error = ()>> {
 }
 
 #[get("/minimum")]
-fn index_min() -> Box<dyn Future<Item = Json<ResponseMin>, Error = ()>> {
+fn index_min(
+    data: web::Data<HashMap<String, String>>,
+) -> Box<dyn Future<Item = Json<ResponseMin>, Error = ()>> {
     let cli = Client::builder().build().unwrap();
     Box::new(
-        cli.get("https://api.data.gov.in/resource/3b01bcb8-0b14-4abf-b6f2-c1bfd384ba69?api-key=579b464db66ec23bdd000001cdd3946e44ce4aad7209ff7b23ac571b&format=json&offset=5&limit=10")
+        cli.get(data.get("api_url").unwrap())
             .send()
             .map_err(|e| println!("Request error: {}", e))
             .and_then(|mut res| {
                 res.json::<Response>()
                     .map(|r| {
                         let mut min = Vec::<u32>::new();
-                        for item in r.records.iter(){
+                        for item in r.records.iter() {
                             min.push(item.pollutant_avg.parse::<u32>().unwrap());
                         }
                         let min_value = *min.iter().min_by(|x, y| x.cmp(y)).unwrap();
-                        let min = ResponseMin{min: min_value,};
+                        let min = ResponseMin { min: min_value };
                         Json(min)
                     })
                     .map_err(|e| println!("unpack error: {}", e))
@@ -163,8 +175,19 @@ fn index_min() -> Box<dyn Future<Item = Json<ResponseMin>, Error = ()>> {
 }
 
 fn main() -> Result<(), ()> {
-    HttpServer::new(|| {
+    let mut settings = config::Config::default();
+
+    settings
+        .merge(config::File::with_name("Settings"))
+        .unwrap()
+        .merge(config::Environment::with_prefix("IND_POLLUTION"))
+        .unwrap();
+
+    let config_map = settings.try_into::<HashMap<String, String>>().unwrap();
+
+    HttpServer::new(move || {
         App::new()
+            .data(config_map.clone())
             .service(index)
             .service(index_avg)
             .service(index_max)
