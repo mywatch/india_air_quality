@@ -8,6 +8,7 @@ use futures::prelude::*;
 use reqwest::r#async::Client;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use log::{info, trace, warn};
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct JsonTargetBucket {
@@ -85,15 +86,21 @@ pub struct ResponseMin {
 fn index(
     data: web::Data<HashMap<String, String>>,
 ) -> Box<dyn Future<Item = Json<Response>, Error = ()>> {
-    let cli = Client::builder().build().unwrap();
+    let cli = match Client::builder().build() {
+        Ok(client) => client,
+        Err(_e) => return Box::new(Err(()).into_future()),
+    };
     Box::new(
-        cli.get(data.get("api_url").unwrap())
+        cli.get(match data.get("api_url") {
+            Some(api_url) => api_url,
+            None => return Box::new(Err(()).into_future()),
+        })
             .send()
-            .map_err(|e| println!("Request error: {}", e))
+            .map_err(|e| warn!("Request error: {}", e))
             .and_then(|mut res| {
                 res.json::<Response>()
                     .map(|r| Json(r))
-                    .map_err(|e| println!("unpack error: {}", e))
+                    .map_err(|e| warn!("unpack error: {}", e))
             }),
     )
 }
@@ -104,9 +111,12 @@ fn index_avg(
 ) -> Box<dyn Future<Item = Json<ResponseAvg>, Error = ()>> {
     let cli = Client::builder().build().unwrap();
     Box::new(
-        cli.get(data.get("api_url").unwrap())
+        cli.get(match data.get("api_url") {
+            Some(api_url) => api_url,
+            None => return Box::new(Err(()).into_future()),
+        })
             .send()
-            .map_err(|e| println!("Request error: {}", e))
+            .map_err(|e| warn!("Request error: {}", e))
             .and_then(|mut res| {
                 res.json::<Response>()
                     .map(|r| {
@@ -119,7 +129,7 @@ fn index_avg(
                         };
                         Json(avg)
                     })
-                    .map_err(|e| println!("unpack error: {}", e))
+                    .map_err(|e| warn!("unpack error: {}", e))
             }),
     )
 }
@@ -130,9 +140,12 @@ fn index_max(
 ) -> Box<dyn Future<Item = Json<ResponseMax>, Error = ()>> {
     let cli = Client::builder().build().unwrap();
     Box::new(
-        cli.get(data.get("api_url").unwrap())
+        cli.get(match data.get("api_url") {
+            Some(api_url) => api_url,
+            None => return Box::new(Err(()).into_future()),
+        })
             .send()
-            .map_err(|e| println!("Request error: {}", e))
+            .map_err(|e| warn!("Request error: {}", e))
             .and_then(|mut res| {
                 res.json::<Response>()
                     .map(|r| {
@@ -144,7 +157,7 @@ fn index_max(
                         let max = ResponseMax { max: max_value };
                         Json(max)
                     })
-                    .map_err(|e| println!("unpack error: {}", e))
+                    .map_err(|e| warn!("unpack error: {}", e))
             }),
     )
 }
@@ -155,9 +168,12 @@ fn index_min(
 ) -> Box<dyn Future<Item = Json<ResponseMin>, Error = ()>> {
     let cli = Client::builder().build().unwrap();
     Box::new(
-        cli.get(data.get("api_url").unwrap())
+        cli.get(match data.get("api_url") {
+            Some(api_url) => api_url,
+            None => return Box::new(Err(()).into_future()),
+        })
             .send()
-            .map_err(|e| println!("Request error: {}", e))
+            .map_err(|e| warn!("Request error: {}", e))
             .and_then(|mut res| {
                 res.json::<Response>()
                     .map(|r| {
@@ -169,7 +185,7 @@ fn index_min(
                         let min = ResponseMin { min: min_value };
                         Json(min)
                     })
-                    .map_err(|e| println!("unpack error: {}", e))
+                    .map_err(|e| warn!("unpack error: {}", e))
             }),
     )
 }
@@ -196,5 +212,5 @@ fn main() -> Result<(), ()> {
     .bind("127.0.0.1:4000")
     .unwrap()
     .run()
-    .map_err(|e| println!("Error: {}", e))
+    .map_err(|e| trace!("Error: {}", e))
 }
