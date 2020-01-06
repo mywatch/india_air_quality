@@ -3,12 +3,12 @@ extern crate actix_web;
 extern crate config;
 
 use actix_web::web::Json;
-use actix_web::{web, App, HttpServer};
+use actix_web::{web, App, HttpServer, http::StatusCode};
 use futures::prelude::*;
 use reqwest::r#async::Client;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use log::{info, trace, warn};
+use log::{trace, warn};
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct JsonTargetBucket {
@@ -213,4 +213,88 @@ fn main() -> Result<(), ()> {
     .unwrap()
     .run()
     .map_err(|e| trace!("Error: {}", e))
+
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use actix_web::test;
+
+
+    fn config_map_test() -> HashMap<String, String> {
+
+        let mut settings = config::Config::default();
+
+        settings
+            .merge(config::File::with_name("Settings"))
+            .unwrap()
+            .merge(config::Environment::with_prefix("IND_POLLUTION"))
+            .unwrap();
+
+        let config_map_tmp = settings.try_into::<HashMap<String, String>>().unwrap();
+        config_map_tmp
+
+    }
+
+
+    #[test]
+    fn test_index_ok() {
+
+        let mut app = test::init_service(
+            App::new()
+                .data(config_map_test().clone())
+                .service(index)
+        );
+
+        let req = test::TestRequest::with_uri("/").to_request();
+        let resp = test::call_service(&mut app, req);
+        assert_eq!(resp.status(), StatusCode::OK);
+
+    }
+
+    #[test]
+    fn test_average_ok() {
+
+        let mut app = test::init_service(
+            App::new()
+                .data(config_map_test().clone())
+                .service(index_avg)
+        );
+
+        let req = test::TestRequest::with_uri("/average").to_request();
+        let resp = test::call_service(&mut app, req);
+        assert_eq!(resp.status(), StatusCode::OK);
+
+    }
+
+    #[test]
+    fn test_maximum_ok() {
+
+        let mut app = test::init_service(
+            App::new()
+                .data(config_map_test().clone())
+                .service(index_max)
+        );
+
+        let req = test::TestRequest::with_uri("/maximum").to_request();
+        let resp = test::call_service(&mut app, req);
+        assert_eq!(resp.status(), StatusCode::OK);
+
+    }
+
+    #[test]
+    fn test_minimum_ok() {
+
+        let mut app = test::init_service(
+            App::new()
+                .data(config_map_test().clone())
+                .service(index_min)
+        );
+
+        let req = test::TestRequest::with_uri("/minimum").to_request();
+        let resp = test::call_service(&mut app, req);
+        assert_eq!(resp.status(), StatusCode::OK);
+
+    }
 }
