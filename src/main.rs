@@ -3,12 +3,12 @@ extern crate actix_web;
 extern crate config;
 
 use actix_web::web::Json;
-use actix_web::{web, App, HttpServer, http::StatusCode};
+use actix_web::{http::StatusCode, web, App, HttpServer};
 use futures::prelude::*;
+use log::{trace, warn};
 use reqwest::r#async::Client;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use log::{trace, warn};
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct JsonTargetBucket {
@@ -95,13 +95,13 @@ fn index(
             Some(api_url) => api_url,
             None => return Box::new(Err(()).into_future()),
         })
-            .send()
-            .map_err(|e| warn!("Request error: {}", e))
-            .and_then(|mut res| {
-                res.json::<Response>()
-                    .map(|r| Json(r))
-                    .map_err(|e| warn!("unpack error: {}", e))
-            }),
+        .send()
+        .map_err(|e| warn!("Request error: {}", e))
+        .and_then(|mut res| {
+            res.json::<Response>()
+                .map(|r| Json(r))
+                .map_err(|e| warn!("unpack error: {}", e))
+        }),
     )
 }
 
@@ -115,22 +115,22 @@ fn index_avg(
             Some(api_url) => api_url,
             None => return Box::new(Err(()).into_future()),
         })
-            .send()
-            .map_err(|e| warn!("Request error: {}", e))
-            .and_then(|mut res| {
-                res.json::<Response>()
-                    .map(|r| {
-                        let mut sum = 0;
-                        for item in r.records.iter() {
-                            sum += item.pollutant_avg.parse::<u32>().unwrap();
-                        }
-                        let avg = ResponseAvg {
-                            avg: sum / (r.records.len() as u32),
-                        };
-                        Json(avg)
-                    })
-                    .map_err(|e| warn!("unpack error: {}", e))
-            }),
+        .send()
+        .map_err(|e| warn!("Request error: {}", e))
+        .and_then(|mut res| {
+            res.json::<Response>()
+                .map(|r| {
+                    let mut sum = 0;
+                    for item in r.records.iter() {
+                        sum += item.pollutant_avg.parse::<u32>().unwrap();
+                    }
+                    let avg = ResponseAvg {
+                        avg: sum / (r.records.len() as u32),
+                    };
+                    Json(avg)
+                })
+                .map_err(|e| warn!("unpack error: {}", e))
+        }),
     )
 }
 
@@ -144,21 +144,21 @@ fn index_max(
             Some(api_url) => api_url,
             None => return Box::new(Err(()).into_future()),
         })
-            .send()
-            .map_err(|e| warn!("Request error: {}", e))
-            .and_then(|mut res| {
-                res.json::<Response>()
-                    .map(|r| {
-                        let mut max = Vec::<u32>::new();
-                        for item in r.records.iter() {
-                            max.push(item.pollutant_max.parse::<u32>().unwrap());
-                        }
-                        let max_value = *max.iter().max_by(|x, y| x.cmp(y)).unwrap();
-                        let max = ResponseMax { max: max_value };
-                        Json(max)
-                    })
-                    .map_err(|e| warn!("unpack error: {}", e))
-            }),
+        .send()
+        .map_err(|e| warn!("Request error: {}", e))
+        .and_then(|mut res| {
+            res.json::<Response>()
+                .map(|r| {
+                    let mut max = Vec::<u32>::new();
+                    for item in r.records.iter() {
+                        max.push(item.pollutant_max.parse::<u32>().unwrap());
+                    }
+                    let max_value = *max.iter().max_by(|x, y| x.cmp(y)).unwrap();
+                    let max = ResponseMax { max: max_value };
+                    Json(max)
+                })
+                .map_err(|e| warn!("unpack error: {}", e))
+        }),
     )
 }
 
@@ -172,21 +172,21 @@ fn index_min(
             Some(api_url) => api_url,
             None => return Box::new(Err(()).into_future()),
         })
-            .send()
-            .map_err(|e| warn!("Request error: {}", e))
-            .and_then(|mut res| {
-                res.json::<Response>()
-                    .map(|r| {
-                        let mut min = Vec::<u32>::new();
-                        for item in r.records.iter() {
-                            min.push(item.pollutant_avg.parse::<u32>().unwrap());
-                        }
-                        let min_value = *min.iter().min_by(|x, y| x.cmp(y)).unwrap();
-                        let min = ResponseMin { min: min_value };
-                        Json(min)
-                    })
-                    .map_err(|e| warn!("unpack error: {}", e))
-            }),
+        .send()
+        .map_err(|e| warn!("Request error: {}", e))
+        .and_then(|mut res| {
+            res.json::<Response>()
+                .map(|r| {
+                    let mut min = Vec::<u32>::new();
+                    for item in r.records.iter() {
+                        min.push(item.pollutant_avg.parse::<u32>().unwrap());
+                    }
+                    let min_value = *min.iter().min_by(|x, y| x.cmp(y)).unwrap();
+                    let min = ResponseMin { min: min_value };
+                    Json(min)
+                })
+                .map_err(|e| warn!("unpack error: {}", e))
+        }),
     )
 }
 
@@ -213,7 +213,6 @@ fn main() -> Result<(), ()> {
     .unwrap()
     .run()
     .map_err(|e| trace!("Error: {}", e))
-
 }
 
 #[cfg(test)]
@@ -221,9 +220,7 @@ mod tests {
     use super::*;
     use actix_web::test;
 
-
     fn config_map_test() -> HashMap<String, String> {
-
         let mut settings = config::Config::default();
 
         settings
@@ -234,67 +231,53 @@ mod tests {
 
         let config_map_tmp = settings.try_into::<HashMap<String, String>>().unwrap();
         config_map_tmp
-
     }
-
 
     #[test]
     fn test_index_ok() {
-
-        let mut app = test::init_service(
-            App::new()
-                .data(config_map_test().clone())
-                .service(index)
-        );
+        let mut app = test::init_service(App::new().data(config_map_test().clone()).service(index));
 
         let req = test::TestRequest::with_uri("/").to_request();
         let resp = test::call_service(&mut app, req);
         assert_eq!(resp.status(), StatusCode::OK);
-
     }
 
     #[test]
     fn test_average_ok() {
-
         let mut app = test::init_service(
             App::new()
                 .data(config_map_test().clone())
-                .service(index_avg)
+                .service(index_avg),
         );
 
         let req = test::TestRequest::with_uri("/average").to_request();
         let resp = test::call_service(&mut app, req);
         assert_eq!(resp.status(), StatusCode::OK);
-
     }
 
     #[test]
     fn test_maximum_ok() {
-
         let mut app = test::init_service(
             App::new()
                 .data(config_map_test().clone())
-                .service(index_max)
+                .service(index_max),
         );
 
         let req = test::TestRequest::with_uri("/maximum").to_request();
         let resp = test::call_service(&mut app, req);
         assert_eq!(resp.status(), StatusCode::OK);
-
     }
 
     #[test]
     fn test_minimum_ok() {
-
         let mut app = test::init_service(
             App::new()
                 .data(config_map_test().clone())
-                .service(index_min)
+                .service(index_min),
         );
 
         let req = test::TestRequest::with_uri("/minimum").to_request();
         let resp = test::call_service(&mut app, req);
         assert_eq!(resp.status(), StatusCode::OK);
-
     }
 }
